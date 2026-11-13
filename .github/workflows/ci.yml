@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 env:
-  AZURE_RESOURCE_GROUP: rg-azure-ai-lab
+  AZURE_RESOURCE_GROUP: rg-vmanikandandevan-9928
   CONTAINER_APP_NAME: azure-ai-service
 
 jobs:
