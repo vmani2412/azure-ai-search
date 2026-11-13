@@ -65,5 +65,7 @@ jobs:
           acrPassword: ${{ secrets.ACR_PASSWORD }}
           containerAppName: ${{ env.CONTAINER_APP_NAME }}
           resourceGroup: ${{ env.AZURE_RESOURCE_GROUP }}
+          location: southindia
+          targetPort: 8000
           imageToBuild: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.CONTAINER_APP_NAME }}:${{ github.sha }}
 
