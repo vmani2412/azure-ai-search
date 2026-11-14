@@ -12,6 +12,11 @@ class Settings(BaseSettings):
     azure_openai_deployment: str
     azure_openai_api_version: str = "2024-08-01-preview"
 
+    azure_search_endpoint: str | None = None
+    azure_search_api_key: SecretStr | None = None
+    azure_search_index: str = "azureblob-index"
+    azure_search_top_k: int = 3
+
     llm_timeout_s: float = 30.0
     llm_max_retries: int = 3
     llm_base_delay_s: float = 1.0

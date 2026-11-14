@@ -11,6 +11,7 @@ from app.config import get_settings
 from app.logging_conf import request_id_var, setup_logging
 from app.schemas import ChatRequest, ChatResponse
 from app.services.llm import ContentFilterError, LLMClient, RateLimitExhaustedError
+from app.services.search import SearchClient
 
 log = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     setup_logging(settings.log_level)
     app.state.llm = LLMClient(settings)  # one client per process, reused across requests
+    app.state.search = SearchClient(settings)
     yield
 
 
@@ -55,14 +57,26 @@ def get_llm(request: Request) -> LLMClient:
     return client
 
 
+def get_search(request: Request) -> SearchClient | None:
+    search: SearchClient | None = getattr(request.app.state, "search", None)
+    return search
+
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest, llm: Annotated[LLMClient, Depends(get_llm)]) -> ChatResponse:
-    result = await llm.chat(req.message, req.max_tokens)
+async def chat(
+    req: ChatRequest,
+    llm: Annotated[LLMClient, Depends(get_llm)],
+    search: Annotated[SearchClient | None, Depends(get_search)] = None,
+) -> ChatResponse:
+    context: str | None = None
+    if search is not None and search.is_configured:
+        context = await search.search(req.message)
+    result = await llm.chat(req.message, req.max_tokens, context=context)
     return ChatResponse(
         answer=result.text,
         prompt_tokens=result.prompt_tokens,

@@ -8,11 +8,13 @@ from pydantic import SecretStr
 
 from app.config import Settings
 from app.services.llm import (
+    NO_DATA_MESSAGE,
     ContentFilterError,
     LLMClient,
     RateLimitExhaustedError,
     backoff_delay,
 )
+from app.services.search import SearchClient
 
 
 def make_settings(**kw: Any) -> Settings:
@@ -20,6 +22,8 @@ def make_settings(**kw: Any) -> Settings:
         "azure_openai_endpoint": "https://x.openai.azure.com",
         "azure_openai_api_key": SecretStr("k"),
         "azure_openai_deployment": "d",
+        "azure_search_endpoint": None,
+        "azure_search_api_key": None,
         "llm_max_retries": 3,
         "llm_base_delay_s": 1.0,
         "llm_max_delay_s": 8.0,
@@ -161,3 +165,56 @@ async def test_other_bad_request_propagates() -> None:
 def test_backoff_is_capped() -> None:
     rng = random.Random(0)
     assert all(backoff_delay(20, 1.0, 8.0, rng) <= 8.0 for _ in range(50))
+
+
+async def test_grounded_empty_context_returns_no_data_without_calling_llm() -> None:
+    fake = FakeCompletions([Resp()])
+    c = LLMClient(make_settings(), fake, SleepRecorder())
+    r = await c.chat("unknown question", context="   ")
+    assert r.text == NO_DATA_MESSAGE
+    assert r.prompt_tokens == 0
+    assert fake.calls == 0
+
+
+async def test_grounded_with_context_calls_llm() -> None:
+    fake = FakeCompletions([Resp()])
+    c = LLMClient(make_settings(), fake, SleepRecorder())
+    r = await c.chat("question", context="Fact: Sky is blue.")
+    assert r.text == "hi"
+    assert fake.calls == 1
+
+
+async def test_search_client_returns_formatted_chunks() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["api-key"] == "search-secret"
+        return httpx.Response(
+            200,
+            json={
+                "value": [
+                    {
+                        "metadata_storage_name": "doc1.txt",
+                        "content": "Tallest building is Burj Khalifa.",
+                    },
+                    {"id": "2", "custom_field": "Height is 828m."},
+                ]
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as http_client:
+        s = make_settings(
+            azure_search_endpoint="https://learnaisearch24.search.windows.net",
+            azure_search_api_key=SecretStr("search-secret"),
+            azure_search_index="azureblob-index",
+        )
+        client = SearchClient(s, http_client=http_client)
+        assert client.is_configured is True
+        ctx = await client.search("tallest building")
+        assert "[Source: doc1.txt]\nTallest building is Burj Khalifa." in ctx
+        assert "[Source: 2]\ncustom_field: Height is 828m." in ctx
+
+
+async def test_search_client_unconfigured_returns_empty() -> None:
+    client = SearchClient(make_settings())
+    assert client.is_configured is False
+    assert await client.search("anything") == ""

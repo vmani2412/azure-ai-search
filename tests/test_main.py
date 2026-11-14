@@ -4,7 +4,7 @@ import logging
 from httpx import ASGITransport, AsyncClient
 
 from app.logging_conf import JsonFormatter, request_id_var, setup_logging
-from app.main import app, get_llm
+from app.main import app, get_llm, get_search
 from app.services.llm import (
     ContentFilterError,
     LLMClient,
@@ -16,11 +16,27 @@ from app.services.llm import (
 class StubLLM:
     def __init__(self, outcome: LLMResult | Exception) -> None:
         self.outcome = outcome
+        self.last_context: str | None = None
 
-    async def chat(self, message: str, max_tokens: int = 300) -> LLMResult:
+    async def chat(
+        self,
+        message: str,
+        max_tokens: int = 1000,
+        context: str | None = None,
+    ) -> LLMResult:
+        self.last_context = context
         if isinstance(self.outcome, Exception):
             raise self.outcome
         return self.outcome
+
+
+class StubSearch:
+    def __init__(self, result: str, configured: bool = True) -> None:
+        self.result = result
+        self.is_configured = configured
+
+    async def search(self, query: str) -> str:
+        return self.result
 
 
 async def test_health_endpoint() -> None:
@@ -45,6 +61,23 @@ async def test_chat_endpoint_success() -> None:
             "retries": 1,
         }
         assert "X-Request-ID" in resp.headers
+    finally:
+        app.dependency_overrides.clear()
+
+
+async def test_chat_endpoint_with_search_context() -> None:
+    stub_llm = StubLLM(
+        LLMResult(text="grounded answer", prompt_tokens=10, completion_tokens=5, retries=0)
+    )
+    stub_search = StubSearch("[Source: doc.txt]\ngrounded fact")
+    app.dependency_overrides[get_llm] = lambda: stub_llm  # type: ignore[return-value]
+    app.dependency_overrides[get_search] = lambda: stub_search  # type: ignore[return-value]
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            resp = await ac.post("/chat", json={"message": "question"})
+        assert resp.status_code == 200
+        assert resp.json()["answer"] == "grounded answer"
+        assert stub_llm.last_context == "[Source: doc.txt]\ngrounded fact"
     finally:
         app.dependency_overrides.clear()
 
