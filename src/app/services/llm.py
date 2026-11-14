@@ -110,7 +110,7 @@ class LLMClient:
                 resp = await self._completions.create(
                     model=self._s.azure_openai_deployment,
                     messages=[{"role": "user", "content": message}],
-                    max_tokens=max_tokens,
+                    max_completion_tokens=max_tokens,
                 )
             except openai.RateLimitError as exc:
                 last_retry_after = _retry_after_seconds(exc)
