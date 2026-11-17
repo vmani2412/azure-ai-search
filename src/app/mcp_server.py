@@ -16,7 +16,7 @@ class _MCPServerProtocol(Protocol):
     def run(self, *args: Any, **kwargs: Any) -> None: ...
 
 
-class _FallbackFastMCP:
+class _FallbackFastMCP:  # pragma: no cover
     """Lightweight fallback when `fastmcp` package is not installed in the current environment."""
 
     def __init__(self, name: str) -> None:

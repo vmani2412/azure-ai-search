@@ -142,6 +142,10 @@ class QdrantService:
         self._http = http_client or httpx.AsyncClient(timeout=settings.llm_timeout_s)
         self._ingested = False
 
+    @property
+    def collection_name(self) -> str:
+        return self._s.qdrant_collection
+
     def _headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
         if self._s.qdrant_api_key and self._s.qdrant_api_key.get_secret_value().strip():

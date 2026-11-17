@@ -107,7 +107,7 @@ async def qdrant_ingest(
     count = await qdrant.ingest_docs()
     return IngestResponse(
         status="ok",
-        collection=get_settings().qdrant_collection,
+        collection=getattr(qdrant, "collection_name", "docs_collection"),
         points_indexed=count,
     )
 
