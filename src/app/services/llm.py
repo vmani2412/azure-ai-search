@@ -18,6 +18,16 @@ from app.config import Settings
 
 log = logging.getLogger(__name__)
 
+NO_DATA_MESSAGE = "Requested data is not available."
+
+GROUNDED_SYSTEM_PROMPT = (
+    "You are a strict data-grounded assistant. "
+    "Answer the user's question ONLY using the facts in the PROVIDED CONTEXT below. "
+    "Do NOT use outside knowledge, assumptions, or general training data. "
+    "If the answer is not explicitly present in the PROVIDED CONTEXT, "
+    f"reply with the exact phrase: '{NO_DATA_MESSAGE}'"
+)
+
 
 class RateLimitExhaustedError(Exception):
     """429 persisted after all retries."""
@@ -102,14 +112,39 @@ class LLMClient:
         self._sleep = sleep
         self._rng = rng or random.Random()
 
-    async def chat(self, message: str, max_tokens: int = 300) -> LLMResult:
+    async def chat(
+        self,
+        message: str,
+        max_tokens: int = 1000,
+        context: str | None = None,
+    ) -> LLMResult:
+        if context is not None and not context.strip():
+            log.info("grounded_search_no_data")
+            return LLMResult(
+                text=NO_DATA_MESSAGE,
+                prompt_tokens=0,
+                completion_tokens=0,
+                retries=0,
+            )
+
+        if context is not None:
+            messages: list[dict[str, str]] = [
+                {
+                    "role": "system",
+                    "content": f"{GROUNDED_SYSTEM_PROMPT}\n\nPROVIDED CONTEXT:\n{context}",
+                },
+                {"role": "user", "content": message},
+            ]
+        else:
+            messages = [{"role": "user", "content": message}]
+
         retries = 0
         last_retry_after: float | None = None
         for attempt in range(self._s.llm_max_retries + 1):
             try:
                 resp = await self._completions.create(
                     model=self._s.azure_openai_deployment,
-                    messages=[{"role": "user", "content": message}],
+                    messages=messages,
                     max_completion_tokens=max_tokens,
                 )
             except openai.RateLimitError as exc:
