@@ -5,11 +5,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Create non-root user
-RUN adduser --disabled-password --gecos "" appuser
+# Install git for Git/CI-CD MCP server and create non-root user
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/* \
+    && adduser --disabled-password --gecos "" appuser \
+    && git config --system --add safe.directory /app
 
 COPY pyproject.toml ./
 COPY src ./src
+COPY docs ./docs
 
 RUN pip install --no-cache-dir .
 

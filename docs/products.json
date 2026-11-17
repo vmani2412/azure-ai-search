@@ -1,0 +1,23 @@
+[
+  {
+    "product_id": "1",
+    "name": "Nike Running Shoes",
+    "category": "Shoes",
+    "price": 2500,
+    "description": "Comfortable running shoes for sports"
+  },
+  {
+    "product_id": "2",
+    "name": "Gaming Laptop",
+    "category": "Electronics",
+    "price": 70000,
+    "description": "High performance laptop for gaming"
+  },
+  {
+    "product_id": "3",
+    "name": "Wireless Headphones",
+    "category": "Electronics",
+    "price": 3000,
+    "description": "Bluetooth noise cancellation headphones"
+  }
+]

@@ -11,3 +11,18 @@ class ChatResponse(BaseModel):
     prompt_tokens: int
     completion_tokens: int
     retries: int = 0
+
+
+class IngestResponse(BaseModel):
+    status: str
+    collection: str
+    points_indexed: int
+
+
+class AzureSyncResponse(BaseModel):
+    status: str
+    storage_container: str
+    blobs_uploaded: list[str]
+    search_index: str
+    documents_indexed: int
+    verified_search_hits: int

@@ -1,12 +1,43 @@
 services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+    restart: unless-stopped
+
   azure-ai-service:
     build:
       context: .
       dockerfile: Dockerfile
     image: azure-ai-service:local
     container_name: azure-ai-service
+    depends_on:
+      - qdrant
     ports:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - DOCS_DIR=docs
+    volumes:
+      - ./docs:/app/docs:ro
+      - ./.git:/app/.git:ro
+    restart: unless-stopped
+
+  mcp-server:
+    image: azure-ai-service:local
+    container_name: git-cicd-mcp-server
+    depends_on:
+      - azure-ai-service
+    command: ["python", "-m", "app.mcp_server"]
+    ports:
+      - "8001:8001"
+    environment:
+      - MCP_TRANSPORT=http
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8001
+    volumes:
+      - ./.git:/app/.git:ro
     restart: unless-stopped
