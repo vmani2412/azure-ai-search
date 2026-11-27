@@ -13,3 +13,7 @@ htmlcov/
 dist/
 build/
 .DS_Store
+
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
